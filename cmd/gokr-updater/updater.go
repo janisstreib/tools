@@ -56,7 +56,7 @@ func main() {
 		log.Fatal(err)
 	}
 	baseUrl.Path = "/"
-	httpClient, foundMatchingCertificate, err := httpclient.GetTLSHttpClientByTLSFlag(useTLS, baseUrl)
+	updaterObj, foundMatchingCertificate, err := httpclient.GetUpdaterByTLSFlag(useTLS, baseUrl)
 	remoteScheme, err := httpclient.GetRemoteScheme(baseUrl)
 	if remoteScheme == "https" {
 		baseUrl.Scheme = "https"
@@ -81,7 +81,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := updater.UpdateRoot(baseUrl.String(), f, httpClient); err != nil {
+		if err := updater.UpdateRoot(updaterObj, f); err != nil {
 			log.Fatalf("updating root file system: %v", err)
 		}
 	}
@@ -92,16 +92,16 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := updater.UpdateBoot(baseUrl.String(), f, httpClient); err != nil {
+		if err := updater.UpdateBoot(updaterObj, f); err != nil {
 			log.Fatalf("updating boot file system: %v", err)
 		}
 	}
 
-	if err := updater.Switch(baseUrl.String(), httpClient); err != nil {
+	if err := updater.Switch(updaterObj); err != nil {
 		log.Fatalf("switching to non-active partition: %v", err)
 	}
 
-	if err := updater.Reboot(baseUrl.String(), httpClient); err != nil {
+	if err := updater.Reboot(updaterObj); err != nil {
 		log.Fatalf("reboot: %v", err)
 	}
 

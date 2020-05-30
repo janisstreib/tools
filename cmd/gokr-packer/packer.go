@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -466,18 +465,17 @@ func logic() error {
 	partuuid := derivePartUUID(*hostname)
 	usePartuuid := true
 	var (
-		updateHttpClient         *http.Client
+		updaterObj               *updater.Updater
 		foundMatchingCertificate bool
-		updateBaseUrl            *url.URL
 	)
 
 	if *update != "" {
-		updateBaseUrl, err = url.Parse(*update)
+		updateBaseUrl, err := url.Parse(*update)
 		if err != nil {
 			return err
 		}
 
-		updateHttpClient, foundMatchingCertificate, err = httpclient.GetTLSHttpClientByTLSFlag(useTLS, updateBaseUrl)
+		updaterObj, foundMatchingCertificate, err = httpclient.GetUpdaterByTLSFlag(useTLS, updateBaseUrl)
 		if err != nil {
 			return fmt.Errorf("getting http client by tls flag: %v", err)
 		}
@@ -506,7 +504,7 @@ func logic() error {
 		}
 		updateBaseUrl.Path = "/"
 
-		usePartuuid, err = updater.TargetSupports(updateBaseUrl.String(), "partuuid", updateHttpClient)
+		usePartuuid, err = updater.TargetSupports(updaterObj, "partuuid")
 		if err != nil {
 			return fmt.Errorf("checking target support: %v", err)
 		}
@@ -734,20 +732,20 @@ func logic() error {
 		}
 	}
 
-	updateBaseUrl.Path = "/"
+	updaterObj.BaseUrl.Path = "/"
 	log.Printf("Updating %q", *update)
 
 	// Start with the root file system because writing to the non-active
 	// partition cannot break the currently running system.
-	if err := updater.UpdateRoot(updateBaseUrl.String(), rootReader, updateHttpClient); err != nil {
+	if err := updater.UpdateRoot(updaterObj, rootReader); err != nil {
 		return fmt.Errorf("updating root file system: %v", err)
 	}
 
-	if err := updater.UpdateBoot(updateBaseUrl.String(), bootReader, updateHttpClient); err != nil {
+	if err := updater.UpdateBoot(updaterObj, bootReader); err != nil {
 		return fmt.Errorf("updating boot file system: %v", err)
 	}
 
-	if err := updater.UpdateMBR(updateBaseUrl.String(), mbrReader, updateHttpClient); err != nil {
+	if err := updater.UpdateMBR(updaterObj, mbrReader); err != nil {
 		if err == updater.ErrUpdateHandlerNotImplemented {
 			log.Printf("target does not support updating MBR yet, ignoring")
 		} else {
@@ -755,11 +753,11 @@ func logic() error {
 		}
 	}
 
-	if err := updater.Switch(updateBaseUrl.String(), updateHttpClient); err != nil {
+	if err := updater.Switch(updaterObj); err != nil {
 		return fmt.Errorf("switching to non-active partition: %v", err)
 	}
 
-	if err := updater.Reboot(updateBaseUrl.String(), updateHttpClient); err != nil {
+	if err := updater.Reboot(updaterObj); err != nil {
 		return fmt.Errorf("reboot: %v", err)
 	}
 
